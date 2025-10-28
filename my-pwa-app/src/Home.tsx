@@ -2,7 +2,6 @@ import React, { useEffect } from "react";
 import "./Home.css";
 
 import AOS from "aos";
-import Notes from "./components/Notes";
 import NotesModal from "./components/Notes";
 
 const Home: React.FC = () => {

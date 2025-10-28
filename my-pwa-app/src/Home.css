@@ -11,17 +11,23 @@ body {
   overflow-x: hidden;
 }
 
+/* Page background: use the requested gradient so the whole page matches the hero */
+.home, body {
+  background: linear-gradient(360deg,#5236ab 0%,#e41937 100%);
+  min-height: 100vh;
+}
+
 /* Hero Section */
 .hero {
   min-height: 80vh;
-  background: linear-gradient(135deg, #198754, #28a745);
+  background: linear-gradient(360deg,#5236ab 0%,#e41937 100%);
   color: white;
   text-shadow: 1px 1px 3px rgba(0, 0, 0, 0.3);
 }
 
 /* Capacitor Section */
 .capacitor-section {
-  background: linear-gradient(135deg, #0f2027, #203a43, #2c5364);
+  background: linear-gradient(360deg,#5236ab 0%,#e41937 100%);
 }
 
 /* Images */
@@ -41,4 +47,75 @@ img {
 .card:hover {
   transform: translateY(-5px);
   box-shadow: 0 10px 20px rgba(0, 0, 0, 0.15);
+}
+
+/* Native Integration - color-coded cards */
+.home .card.bg-primary {
+  background: linear-gradient(360deg,#5236ab 0%,#e41937 100%); /* blue gradient for Capacitor */
+  color: #ffffff;
+  border: none;
+}
+.home .card.bg-primary .card-title,
+.home .card.bg-primary p,
+.home .card.bg-primary .small {
+  color: rgba(255,255,255,0.95);
+}
+.home .card.bg-primary i {
+  color: rgba(255,255,255,0.95);
+}
+
+.home .card.bg-warning {
+  background: linear-gradient(360deg,#5236ab 0%,#e41937 100%); /* warm gradient for Ionic */
+  color: #1f1f1f;
+  border: none;
+}
+.home .card.bg-warning .card-title,
+.home .card.bg-warning p,
+.home .card.bg-warning .small {
+  color: rgba(31,31,31,0.95);
+}
+.home .card.bg-warning i {
+  color: rgba(3, 185, 246, 0.95);
+}
+
+/* Slight stronger hover lift for native cards */
+.home .card.bg-primary:hover,
+.home .card.bg-warning:hover {
+  transform: translateY(-8px) scale(1.01);
+  box-shadow: 0 18px 36px rgba(88, 150, 176, 0.18);
+}
+
+/* General fade animations */
+[data-aos] {
+  opacity: 0;
+  transition-property: transform, opacity;
+}
+
+[data-aos].aos-animate {
+  opacity: 1;
+}
+
+/* Gradient header text */
+.gradient-text {
+  background: linear-gradient(90deg, #00b894, #00cec9);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+ 
+
+/* Capacitor section background */
+.capacitor-section {
+  background: linear-gradient(135deg, #00b894, #00cec9);
+}
+
+/* Smooth fade-up effect */
+[data-aos="fade-up"] {
+  transform: translateY(30px);
+  opacity: 0;
+  transition: all 0.8s ease-in-out;
+}
+
+[data-aos="fade-up"].aos-animate {
+  transform: translateY(0);
+  opacity: 1;
 }

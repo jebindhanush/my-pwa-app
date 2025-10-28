@@ -2,6 +2,8 @@ import React, { useEffect } from "react";
 import "./Home.css";
 
 import AOS from "aos";
+import Notes from "./components/Notes";
+import NotesModal from "./components/Notes";
 
 const Home: React.FC = () => {
       useEffect(() => {
@@ -27,7 +29,8 @@ const Home: React.FC = () => {
         >
           Learn More
         </a>
-      </section>
+      </section> 
+   
 
       {/* Overview Section */}
       <section id="details" className="py-5 px-4 px-md-5 bg-light text-dark" data-aos="fade-up">
@@ -77,6 +80,20 @@ const Home: React.FC = () => {
           </div>
         </div>
       </section>
+
+        <section className="py-5 capacitor-section text-center text-white">
+        <div className="container">
+            <h2>Local Storage (IndexedDB Demo)</h2>
+            <p className="text-light mb-4" style={{ opacity: 0.9 }}>
+            <strong>IndexedDB</strong> is a powerful in-browser database that lets your web app 
+            store structured data locally. It’s ideal for offline support, caching, and 
+            syncing user data when internet access returns — making it perfect for 
+            Progressive Web Apps (PWAs) and modern hybrid mobile experiences.
+            </p>
+            <NotesModal />
+        </div>
+        </section>
+
 
       {/* React Integration Section */}
       <section className="py-5 px-4 px-md-5 bg-white text-dark" data-aos="fade-up">
@@ -257,7 +274,7 @@ const Home: React.FC = () => {
       </section>
 
       {/* Native Features Section */}
-      <section className="py-5 px-4 px-md-5 bg-dark text-white" data-aos="fade-up">
+      <section className="py-5 px-4 px-md-5 text-white" data-aos="fade-up">
         <h2 className="fw-bold text-center mb-5">Native Integration 📱</h2>
         <div className="row g-4">
           <div className="col-md-6">
@@ -320,7 +337,7 @@ const Home: React.FC = () => {
       </section>
 
       {/* Footer */}
-      <footer className="bg-dark text-center text-white py-3">
+      <footer className="text-center text-white py-3">
         © {new Date().getFullYear()} POC — React + PWA + Capacitor Integration.
       </footer>
     </div>

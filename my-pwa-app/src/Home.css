@@ -1,0 +1,44 @@
+html,
+body {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  overflow-x: hidden;
+}
+
+.home {
+  width: 100vw;
+  overflow-x: hidden;
+}
+
+/* Hero Section */
+.hero {
+  min-height: 80vh;
+  background: linear-gradient(135deg, #198754, #28a745);
+  color: white;
+  text-shadow: 1px 1px 3px rgba(0, 0, 0, 0.3);
+}
+
+/* Capacitor Section */
+.capacitor-section {
+  background: linear-gradient(135deg, #0f2027, #203a43, #2c5364);
+}
+
+/* Images */
+img {
+  max-width: 100%;
+  height: auto;
+  display: block;
+  border-radius: 10px;
+}
+
+/* Cards */
+.card {
+  border-radius: 15px;
+  transition: all 0.3s ease-in-out;
+}
+
+.card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 10px 20px rgba(0, 0, 0, 0.15);
+}

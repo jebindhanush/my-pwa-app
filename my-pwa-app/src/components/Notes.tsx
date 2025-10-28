@@ -60,11 +60,12 @@ const NotesModal: React.FC = () => {
           <div className="modal-dialog modal-dialog-centered modal-md">
             <div className="modal-content border-0 shadow-lg rounded-4">
               <div
-                className="modal-header bg-primary text-white py-2"
+                className="modal-header text-white py-2"
                 style={{
-                  borderTopLeftRadius: "1rem",
-                  borderTopRightRadius: "1rem",
-                }}
+        borderTopLeftRadius: "1rem",
+        borderTopRightRadius: "1rem",
+        backgroundImage: "linear-gradient(90deg, #5236ab, #e41937)",
+      }}
               >
                 <h6 className="modal-title fw-semibold">My Notes</h6>
                 <button

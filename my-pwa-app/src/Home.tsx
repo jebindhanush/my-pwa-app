@@ -1,20 +1,56 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import "./Home.css";
 import AOS from "aos";
-import NotesModal from "./components/Notes";
+import NotesModal from "./components/NotesModal";
+import { Capacitor } from "@capacitor/core";
 
 const Home: React.FC = () => {
+  const [isApp, setIsApp] = useState(false);
+
   useEffect(() => {
     AOS.init({
       duration: 1000,
       once: true,
       easing: "ease-in-out",
     });
+
+    // ✅ Detect if running as native app or installed PWA
+    const isCapacitorApp = Capacitor.isNativePlatform();
+    const isStandalonePWA =
+      window.matchMedia("(display-mode: standalone)").matches ||
+      (window.navigator as any).standalone === true;
+
+    setIsApp(isCapacitorApp || isStandalonePWA);
   }, []);
 
+  const handleDownloadClick = () => {
+    alert("⚠️ Unsigned test APK — installation may show a warning.");
+  };
+
   return (
-    <div className="home">
-      {/* 🌍 Hero Section */}
+    <div className="home position-relative">
+      {/* 🔗 APK Download Button (hidden in app or installed PWA) */}
+      {!isApp && (
+        <div className="position-absolute top-0 end-0 p-3">
+          <a
+            href="https://github.com/jebindhanush/my-pwa-app/releases/download/test/app-debug.apk"
+            onClick={handleDownloadClick}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="btn btn-outline-light fw-semibold shadow-sm"
+            style={{
+              background: "linear-gradient(90deg, #5236ab, #e41937)",
+              color: "white",
+              border: "none",
+              borderRadius: "20px",
+            }}
+          >
+            📦 Download APK
+          </a>
+        </div>
+      )}
+
+      {/* 🌍 Top Section */}
       <section className="hero text-white d-flex flex-column justify-content-center align-items-start px-4 px-md-5">
         <h1 className="display-4 fw-bold mb-3">Build Once. Run Everywhere 🌍</h1>
         <p className="lead mb-4">
@@ -39,8 +75,9 @@ const Home: React.FC = () => {
         <div className="text-center mb-5">
           <h2 className="fw-bold">What is a PWA?</h2>
           <p className="text-secondary">
-            A <strong>Progressive Web App (PWA)</strong> is a web application that behaves
-            like a native app — fast, installable, and works offline from a single codebase.
+            A <strong>Progressive Web App (PWA)</strong> is a web application
+            that behaves like a native app — fast, installable, and works
+            offline from a single codebase.
           </p>
         </div>
 
@@ -94,10 +131,7 @@ const Home: React.FC = () => {
       </section>
 
       {/* ⚛️ React + PWA */}
-      <section
-        className="py-5 px-4 px-md-5 bg-white text-dark"
-        data-aos="fade-up"
-      >
+      <section className="py-5 px-4 px-md-5 bg-white text-dark" data-aos="fade-up">
         <div className="row align-items-center g-5">
           <div className="col-md-6">
             <h2 className="fw-bold mb-3 text-success">React + PWA</h2>
@@ -125,7 +159,10 @@ const Home: React.FC = () => {
       </section>
 
       {/* ⚙️ Capacitor Section */}
-      <section className="py-5 px-4 px-md-5 text-white capacitor-section" data-aos="fade-up">
+      <section
+        className="py-5 px-4 px-md-5 text-white capacitor-section"
+        data-aos="fade-up"
+      >
         <div className="row align-items-center g-5">
           <div className="col-md-6 text-center">
             <img
@@ -151,13 +188,9 @@ const Home: React.FC = () => {
       </section>
 
       {/* 📱 Native Integration Section */}
-      <section
-        className="py-5 px-4 px-md-5 bg-white text-dark"
-        data-aos="fade-up"
-      >
+      <section className="py-5 px-4 px-md-5 bg-white text-dark" data-aos="fade-up">
         <h2 className="fw-bold text-center mb-5">Native Integration 📱</h2>
         <div className="row g-4">
-          {/* Capacitor Card */}
           <div className="col-md-6">
             <div className="card bg-primary text-white h-100 border-0 shadow-sm">
               <div className="card-body p-4">
@@ -166,7 +199,7 @@ const Home: React.FC = () => {
                   Capacitor Features
                 </h3>
                 <ul className="list-unstyled small mb-0">
-                  <li>🔌 Native API Bridge – seamless access to device features</li>
+                  <li>🔌 Native API Bridge – access to device features</li>
                   <li>🔄 Live Reload for faster development</li>
                   <li>🛠 Custom Plugins to extend functionality</li>
                   <li>📱 Platform Support: iOS, Android & Electron</li>
@@ -175,7 +208,6 @@ const Home: React.FC = () => {
             </div>
           </div>
 
-          {/* Ionic Card */}
           <div className="col-md-6">
             <div className="card bg-warning text-dark h-100 border-0 shadow-sm">
               <div className="card-body p-4">

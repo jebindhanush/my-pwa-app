@@ -1,9 +1,11 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
-import { VitePWA } from 'vite-plugin-pwa'
-
-// ✅ Fix: ensure plugins array is flattened correctly and typed
+import { VitePWA } from 'vite-plugin-pwa' 
+ 
 export default defineConfig({
+  // Use relative paths so the build works both on project pages and user/org pages
+  // (avoids absolute root '/' which can cause 404s when deployed under a sub-path)
+  base: './',
   plugins: [
     react(),
     VitePWA({
@@ -16,15 +18,17 @@ export default defineConfig({
         theme_color: '#00c853',
         background_color: '#00c853',
         display: 'standalone',
-        start_url: '/',
+         start_url: '/my-pwa-app/',
+         scope: '/my-pwa-app/',
         icons: [
           {
-            src: '/pwa-192x192.png',
+            // Use relative paths so manifest works regardless of the hosting path
+            src: 'pwa-192x192.png',
             sizes: '192x192',
             type: 'image/png',
           },
           {
-            src: '/pwa-512x512.png',
+            src: 'pwa-512x512.png',
             sizes: '512x512',
             type: 'image/png',
           },

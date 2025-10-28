@@ -80,7 +80,7 @@ const Home: React.FC = () => {
         </div>
       </section>
 
-        <section className="py-5 capacitor-section text-center text-white">
+        <section className="py-5 notes text-center text-white">
         <div className="container">
             <h2>Local Storage (IndexedDB Demo)</h2>
             <p className="text-light mb-4" style={{ opacity: 0.9 }}>

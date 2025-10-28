@@ -11,6 +11,17 @@ body {
   overflow-x: hidden;
 }
 
+.notes {
+  width: 100vw;
+  overflow-x: hidden;
+}
+
+.notes {
+  background: linear-gradient(360deg,#5236ab 0%,#e41937 100%);
+  color: white;
+  text-shadow: 1px 1px 3px rgba(0, 0, 0, 0.3);
+}
+
 /* Page background: use the requested gradient so the whole page matches the hero */
 .home, body {
   background: linear-gradient(360deg,#5236ab 0%,#e41937 100%);

@@ -14,7 +14,8 @@ body {
 /* Hero Section */
 .hero {
   min-height: 80vh;
-  background: linear-gradient(135deg, #198754, #28a745);
+  /* background: linear-gradient(135deg, #198754, #28a745); */
+  background: linear-gradient(360deg,#5236ab 0%,#e41937 100%);
   color: white;
   text-shadow: 1px 1px 3px rgba(0, 0, 0, 0.3);
 }

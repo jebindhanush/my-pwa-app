@@ -21,12 +21,21 @@ const Home: React.FC = () => {
           Create a blazing-fast <strong>Progressive Web App (PWA)</strong> using <strong>React</strong>,  
           then transform it into a fully functional <strong>mobile app</strong> with Capacitor by Ionic.
         </p>
-        <a
-          href="#details"
-          className="btn btn-light btn-lg fw-semibold shadow-sm rounded-pill"
-        >
-          Learn More
-        </a>
+        <div className="d-flex flex-column flex-sm-row align-items-center gap-3">
+          <a
+            href="#details"
+            className="btn btn-light btn-lg fw-semibold shadow-sm rounded-pill"
+          >
+            Learn More
+          </a>
+
+          <a
+            href="#/bluetooth"
+            className="btn btn-outline-light btn-lg fw-semibold shadow-sm rounded-pill"
+          >
+            Go to Bluetooth
+          </a>
+        </div>
       </section>
 
       {/* Overview Section */}

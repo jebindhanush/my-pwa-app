@@ -1,7 +1,8 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
-import './index.css';
 import Home from './Home.tsx';
+import BluetoothPage from './pages/Bluetooth';
+import React, { useEffect, useState } from 'react';
 
 // Import AOS (Animate on Scroll)
 import AOS from 'aos';
@@ -23,8 +24,20 @@ AOS.init({
   offset: 100,
 });
 
+const AppRouter: React.FC = () => {
+  const [route, setRoute] = useState<string>(window.location.hash || '#/');
+  useEffect(() => {
+    const onHash = () => setRoute(window.location.hash || '#/');
+    window.addEventListener('hashchange', onHash);
+    return () => window.removeEventListener('hashchange', onHash);
+  }, []);
+
+  if (route === '#/bluetooth') return <BluetoothPage />;
+  return <Home />;
+};
+
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <Home />
+    <AppRouter />
   </StrictMode>
 );

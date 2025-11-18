@@ -1,19 +1,59 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import "./Home.css";
-
+import { Capacitor } from "@capacitor/core";
 import AOS from "aos";
 
 const Home: React.FC = () => {
+  const [isApp, setIsApp] = useState(false);
+
       useEffect(() => {
-    AOS.init({
-      duration: 1000, // Animation duration in ms
-      once: true,     // Only animate once per scroll
-      easing: "ease-in-out",
-    });
-  }, []);
+        AOS.init({
+          duration: 1000, // Animation duration in ms
+          once: true,     // Only animate once per scroll
+          easing: "ease-in-out",
+        });
+
+        // Determine whether we're running as a native app / installed PWA once
+        try {
+          const isCapacitorApp = Capacitor.isNativePlatform();
+          const isStandalonePWA =
+            window.matchMedia("(display-mode: standalone)").matches ||
+            (window.navigator as any).standalone === true;
+          setIsApp(!!(isCapacitorApp || isStandalonePWA));
+        } catch (e) {
+          // If anything throws, keep default false
+          console.debug('isApp detection failed', e);
+        }
+      }, []);
+
+  const handleDownloadClick = () => {
+    alert("⚠️ Unsigned test APK — installation may show a warning.");
+  };
 
   return (
-    <div className="home">
+
+ <div className="home position-relative">
+      {/* 🔗 APK Download Button (hidden in app or installed PWA) */}
+      {!isApp && (
+        <div className="position-absolute top-0 end-0 p-3">
+          <a
+            href="https://github.com/jebindhanush/my-pwa-app/releases/download/test/app-debug.apk"
+            onClick={handleDownloadClick}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="btn btn-outline-light fw-semibold shadow-sm"
+            style={{
+              background: "linear-gradient(90deg, #5236ab, #e41937)",
+              color: "white",
+              border: "none",
+              borderRadius: "20px",
+            }}
+          >
+            📦 Download APK
+          </a>
+        </div>
+      )}
+
       {/* Hero Section */}
       <section className="hero text-white d-flex flex-column justify-content-center align-items-start px-4 px-md-5">
         <h1 className="display-4 fw-bold mb-3">Build Once. Run Everywhere 🌍</h1>

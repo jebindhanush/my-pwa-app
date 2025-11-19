@@ -262,10 +262,13 @@ const capStartNotifications = async (svc: string, char: string) => {
       if (!(navigator as any).bluetooth) throw new Error("Web Bluetooth API not available.");
 
       // Helper mapping for friendly names to common UUIDs
+      // Map friendly names to valid UUID forms (128-bit canonical format).
+      // Web Bluetooth rejects literal names like "battery_service", so only provide
+      // acceptable UUID strings (128-bit) or 16-bit numeric forms (0x180f) if needed.
       const uuidMap: Record<string, string[]> = {
-        battery_service: ["battery_service", "180f", "0000180f-0000-1000-8000-00805f9b34fb"],
-        battery_level: ["battery_level", "2a19", "00002a19-0000-1000-8000-00805f9b34fb"],
-        device_information: ["device_information", "180a", "0000180a-0000-1000-8000-00805f9b34fb"],
+        battery_service: ["0000180f-0000-1000-8000-00805f9b34fb"],
+        battery_level: ["00002a19-0000-1000-8000-00805f9b34fb"],
+        device_information: ["0000180a-0000-1000-8000-00805f9b34fb"],
       };
 
       // Build optionalServices list including provided serviceUuids and some sensible defaults
@@ -278,8 +281,22 @@ const capStartNotifications = async (svc: string, char: string) => {
       for (const s of Array.from(optionalServices)) {
         if (uuidMap[s]) {
           uuidMap[s].forEach((u) => expanded.push(u));
-        } else {
+          continue;
+        }
+
+        // If the caller passed a short 16-bit hex (e.g. '180f' or '2a19') or a
+        // 128-bit UUID include it directly. Reject literal friendly names here
+        // because Web Bluetooth will throw for them.
+        const isShort = /^[0-9a-fA-F]{4}$/.test(s);
+        const is128 = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(s);
+        if (isShort) {
+          // Convert short form to 128-bit canonical string
+          expanded.push(`0000${s}-0000-1000-8000-00805f9b34fb`);
+        } else if (is128) {
           expanded.push(s);
+        } else {
+          // Unknown form: skip to avoid Web Bluetooth throwing an error
+          console.warn('Ignoring unknown service identifier for web requestDevice:', s);
         }
       }
 

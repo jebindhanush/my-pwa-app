@@ -1,0 +1,3 @@
+{
+    "0.4.0": "Updated app version to 0.4.0 in version.ts and displayed it in the footer of Home.tsx."
+}

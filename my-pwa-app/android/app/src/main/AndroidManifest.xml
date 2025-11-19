@@ -1,6 +1,19 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
+ <!-- Bluetooth Permissions -->
+      <!-- Required for various Android API levels -->
+        <uses-permission android:name="android.permission.BLUETOOTH" />
+        <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" />
+
+        <!-- Android 12+ runtime permissions (must also be requested at runtime) -->
+        <uses-permission android:name="android.permission.BLUETOOTH_SCAN" />
+        <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+        <uses-permission android:name="android.permission.BLUETOOTH_ADVERTISE" />
+
+        <!-- For older Android versions scanning required location -->
+        <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+
     <application
         android:allowBackup="true"
         android:icon="@mipmap/ic_launcher"

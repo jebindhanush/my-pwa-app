@@ -2,6 +2,8 @@
 import React, { useEffect, useState, useRef } from "react";
 import AOS from "aos";
 
+import { APP_VERSION } from "../version";
+
 // Capacitor BLE client
 import { BleClient, numbersToDataView } from "@capacitor-community/bluetooth-le";
 
@@ -21,6 +23,7 @@ const Home: React.FC = () => {
   const [isConnected, setIsConnected] = useState(false);
   const [services, setServices] = useState<string[]>([]);
   const [lastMessage, setLastMessage] = useState<string | null>(null);
+  const [batteryLevel, setBatteryLevel] = useState<number | null>(null);
 const notificationCallbackRef = useRef<((ev: any) => void) | null>(null);
 
 
@@ -102,25 +105,92 @@ const notificationCallbackRef = useRef<((ev: any) => void) | null>(null);
 
   // Read a characteristic (returns DataView)
   const capRead = async (svc: string, char: string) => {
-    try {
-      if (!deviceId) throw new Error("Not connected to device.");
-  const result = await BleClient.read(deviceId, svc, char);
-  // plugin may return a DataView directly or an object with `.value` — normalize
-  const dv: DataView | undefined = (result as any)?.value ?? (result as any);
-      let human = "";
-      if (dv) {
-        // try decode as UTF-8 text
+    // Helper: decode various return shapes (DataView, object, base64 string)
+    const decodeResult = (res: any) => {
+      if (!res && res !== 0) return { text: null, bytes: null, dv: null };
+      // If result has `.value`, unwrap
+      const val = (res as any)?.value ?? res;
+
+      // If it's a DataView
+      if (val instanceof DataView) {
+        const bytes = new Uint8Array(val.buffer);
+        let text: string | null = null;
         try {
-          const bytes = new Uint8Array(dv.buffer);
-          human = new TextDecoder().decode(bytes);
+          text = new TextDecoder().decode(bytes);
         } catch {
-          human = Array.from(new Uint8Array(dv.buffer))
-            .map((b) => b.toString(16).padStart(2, "0"))
-            .join(" ");
+          text = Array.from(bytes).map((b) => b.toString(16).padStart(2, "0")).join(" ");
+        }
+        return { text, bytes, dv: val };
+      }
+
+      // If it's an ArrayBuffer or TypedArray
+      if (val && val.buffer && val.byteLength !== undefined) {
+        const bytes = new Uint8Array(val.buffer ?? val);
+        let text: string | null = null;
+        try {
+          text = new TextDecoder().decode(bytes);
+        } catch {
+          text = Array.from(bytes).map((b) => b.toString(16).padStart(2, "0")).join(" ");
+        }
+        return { text, bytes, dv: new DataView(bytes.buffer) };
+      }
+
+      // If it's a base64 string
+      if (typeof val === "string") {
+        try {
+          // atob -> binary string
+          const bin = atob(val);
+          const bytes = Uint8Array.from(bin, (c) => c.charCodeAt(0));
+          let text: string | null = null;
+          try {
+            text = new TextDecoder().decode(bytes);
+          } catch {
+            text = Array.from(bytes).map((b) => b.toString(16).padStart(2, "0")).join(" ");
+          }
+          return { text, bytes, dv: new DataView(bytes.buffer) };
+        } catch (e) {
+          // not base64, treat as plain string
+          return { text: String(val), bytes: null, dv: null };
         }
       }
-      setLastMessage(`Read (${char}): ${human}`);
-      return dv;
+
+      return { text: String(val), bytes: null, dv: null };
+    };
+
+    // Known UUID mappings for common names (battery)
+    const uuidMap: Record<string, string[]> = {
+      battery_service: ["battery_service", "180f", "0000180f-0000-1000-8000-00805f9b34fb"],
+      battery_level: ["battery_level", "2a19", "00002a19-0000-1000-8000-00805f9b34fb"],
+    };
+
+    const svcCandidates = uuidMap[svc] ?? [svc];
+    const charCandidates = uuidMap[char] ?? [char];
+
+    let lastErr: any = null;
+    try {
+      if (!deviceId) throw new Error("Not connected to device.");
+
+      // Try combinations of service/characteristic identifiers so we work across plugin versions
+      for (const s of svcCandidates) {
+        for (const c of charCandidates) {
+            try {
+            const result = await BleClient.read(deviceId, s, c);
+            const decoded = decodeResult(result);
+            setLastMessage(`Read (${c}): ${decoded.text ?? "<binary>"}`);
+            // If a single-byte battery percentage is returned, update visual battery
+            if (decoded.bytes && decoded.bytes.length === 1) {
+              setBatteryLevel(decoded.bytes[0]);
+            }
+            return decoded.dv ?? null;
+          } catch (innerErr) {
+            lastErr = innerErr;
+            // continue trying other formats
+          }
+        }
+      }
+
+      // If we get here, all attempts failed
+      throw lastErr ?? new Error("Read returned no result");
     } catch (err: any) {
       console.error("capRead:", err);
       setLastMessage(`Read error: ${err?.message ?? err}`);
@@ -180,6 +250,11 @@ const capStartNotifications = async (svc: string, char: string) => {
     }
   };
 
+  // Reference some helpers so TypeScript/linters don't mark them as unused in builds where
+  // the example buttons are removed for the demo page.
+  void capWrite;
+  void capStopNotifications;
+
   /* ---------------- Web Bluetooth fallback (kept minimal) ---------------- */
   // If running as PWA in browser and plugin unavailable, keep your earlier navigator.bluetooth logic.
   const webRequestAndConnect = async () => {
@@ -230,115 +305,127 @@ const capStartNotifications = async (svc: string, char: string) => {
 
       {/* Bluetooth Section (updated for Capacitor plugin) */}
       <section className="py-5 px-4 px-md-5 bg-white" data-aos="fade-up" id="bluetooth">
-        <h2 className="fw-bold text-center mb-4">Bluetooth (Capacitor / BLE) — Android Focus 🔵</h2>
+        <div className="container">
+          <div className="text-center mb-4">
+            <h2 className="fw-bold">Bluetooth — Live Demo & Controls 🔵</h2>
+            <p className="text-muted">Connect to a nearby BLE device, read characteristics, start notifications and inspect services — ideal for demos and POCs.</p>
+          </div>
 
-        <div className="row g-4">
-          <div className="col-lg-6">
-            <div className="card h-100 border-0 shadow-sm">
-              <div className="card-body">
-                <h4 className="mb-3">Quick Controls</h4>
-
-                <div className="mb-3">
-                  <small className="text-muted">Feature available?</small>
-                  <div>
-                    {btAvailable === "unknown" && <span className="badge bg-secondary">Checking...</span>}
-                    {btAvailable === "capacitor" && <span className="badge bg-success">Capacitor BLE</span>}
-                    {btAvailable === "web" && <span className="badge bg-info">Web Bluetooth</span>}
-                    {btAvailable === "none" && <span className="badge bg-danger">Not supported</span>}
-                  </div>
+          {/* Feature cards */}
+          <div className="row g-3 mb-4">
+            <div className="col-sm-4">
+              <div className="card h-100 border-0 shadow-sm text-center p-3">
+                <div className="card-body">
+                  <i className="bi bi-phone-fill fs-1 text-primary mb-2"></i>
+                  <h5 className="card-title">Device Connect</h5>
+                  <p className="small text-muted">Prompt device picker and establish a GATT connection (Capacitor or Web Bluetooth).</p>
                 </div>
-
-                <div className="d-grid gap-2 mb-3">
-                  <button className="btn btn-primary" onClick={() => requestDevice()}>
-                    Request & Connect Device
-                  </button>
-                  <button className="btn btn-outline-danger" onClick={() => disconnect()}>
-                    Disconnect
-                  </button>
+              </div>
+            </div>
+            <div className="col-sm-4">
+              <div className="card h-100 border-0 shadow-sm text-center p-3">
+                <div className="card-body">
+                  <i className="bi bi-battery-half fs-1 text-success mb-2"></i>
+                  <h5 className="card-title">Read Characteristics</h5>
+                  <p className="small text-muted">Read battery, device information and custom characteristics in real-time.</p>
                 </div>
-
-                <div className="mb-3">
-                  <small className="text-muted">Connected device</small>
-                  <div>
-                    <strong>{deviceName ?? "—"}</strong>
-                    <div className="small text-muted">Status: {isConnected ? "Connected" : "Disconnected"}</div>
-                  </div>
+              </div>
+            </div>
+            <div className="col-sm-4">
+              <div className="card h-100 border-0 shadow-sm text-center p-3">
+                <div className="card-body">
+                  <i className="bi bi-broadcast-pin fs-1 text-warning mb-2"></i>
+                  <h5 className="card-title">Notifications</h5>
+                  <p className="small text-muted">Start notifications for characteristics and view incoming data live.</p>
                 </div>
-
-                <div className="mb-3">
-                  <small className="text-muted">Available services</small>
-                  <ul className="mb-0">
-                    {services.length === 0 ? <li className="text-muted">None listed</li> : services.map((s) => <li key={s}><code>{s}</code></li>)}
-                  </ul>
-                </div>
-
-                <hr />
-
-                <h5 className="mb-2">Examples (Capacitor)</h5>
-                <div className="mb-2">
-                  <button className="btn btn-sm btn-outline-primary me-2"
-                          onClick={() => capRead("battery_service", "battery_level")}
-                          disabled={!isConnected || btAvailable !== "capacitor"}>
-                    Read Battery Level
-                  </button>
-
-                  <button className="btn btn-sm btn-outline-primary me-2"
-                          onClick={() => capRead("device_information", "manufacturer_name_string")}
-                          disabled={!isConnected || btAvailable !== "capacitor"}>
-                    Read Manufacturer
-                  </button>
-
-                  <button className="btn btn-sm btn-outline-success me-2"
-                          onClick={() => capWrite("device_information", "serial_number_string", "HELLO")}
-                          disabled={!isConnected || btAvailable !== "capacitor"}>
-                    Write Example (serial_number_string)
-                  </button>
-
-                  <button className="btn btn-sm btn-outline-warning me-2"
-                          onClick={() => capStartNotifications("battery_service", "battery_level")}
-                          disabled={!isConnected || btAvailable !== "capacitor"}>
-                    Start Notifications (battery_level)
-                  </button>
-
-                  <button className="btn btn-sm btn-outline-secondary"
-                          onClick={() => capStopNotifications("battery_service", "battery_level")}
-                          disabled={!isConnected || btAvailable !== "capacitor"}>
-                    Stop Notifications
-                  </button>
-                </div>
-
               </div>
             </div>
           </div>
 
-          <div className="col-lg-6">
-            <div className="card h-100 border-0 shadow-sm">
-              <div className="card-body">
-                <h4 className="mb-3">Notes & Platform Tips</h4>
-                <ul className="list-unstyled text-muted">
-                  <li><strong>Install:</strong> <code>npm install @capacitor-community/bluetooth-le</code> and <code>npx cap sync</code>.</li>
-                  <li><strong>Android:</strong> Add BLUETOOTH_CONNECT, BLUETOOTH_SCAN, etc. to AndroidManifest and request runtime permissions on Android 12+. See plugin docs for specifics.</li>
-                  <li><strong>Fallback:</strong> In browser (PWA in Chrome) the plugin may use Web Bluetooth or you can rely on <code>navigator.bluetooth</code>.</li>
-                  <li><strong>Native features:</strong> For background scanning/foreground-service or advanced Android-only features consider native-capable plugins or deeper native code paths (foreground service).</li>
-                </ul>
+          <div className="row g-4">
+            <div className="col-lg-5">
+              <div className="card h-100 border-0 shadow-sm">
+                <div className="card-body">
+                  <h4 className="mb-3">Device Panel</h4>
 
-                <hr />
+                  <div className="d-flex align-items-center mb-3">
+                    <div className="me-3">
+                      <i className="bi bi-device-hdd-fill fs-1 text-secondary"></i>
+                    </div>
+                    <div>
+                      <div className="fw-semibold">{deviceName ?? 'No device'}</div>
+                      <div className="text-muted small">ID: {deviceId ?? '—'}</div>
+                      <div className={`mt-2 badge ${isConnected ? 'bg-success' : 'bg-secondary'}`}>{isConnected ? 'Connected' : 'Disconnected'}</div>
+                    </div>
+                  </div>
 
-                <h5 className="mb-2">Last message</h5>
-                <div className="small text-dark">
-                  {lastMessage ?? <span className="text-muted">No activity yet</span>}
+                  <div className="mb-3">
+                    <small className="text-muted">Controls</small>
+                    <div className="d-flex gap-2 mt-2 flex-wrap">
+                      <button className="btn btn-primary" onClick={() => requestDevice()}>
+                        <i className="bi bi-search me-1" /> Scan & Connect
+                      </button>
+                      <button className="btn btn-secondary" onClick={() => capRequestAndConnect(['battery_service'])}>
+                        <i className="bi bi-battery-half me-1" /> Connect (Battery)
+                      </button>
+                      <button className="btn btn-outline-danger" onClick={() => disconnect()}>
+                        <i className="bi bi-x-circle me-1" /> Disconnect
+                      </button>
+                      <button className="btn btn-outline-primary" onClick={() => capRead('battery_service','battery_level')} disabled={!isConnected || btAvailable !== 'capacitor'}>
+                        <i className="bi bi-battery-half me-1" /> Read Battery
+                      </button>
+                      <button className="btn btn-outline-warning" onClick={() => capStartNotifications('battery_service','battery_level')} disabled={!isConnected || btAvailable !== 'capacitor'}>
+                        <i className="bi bi-bell me-1" /> Start Notifications
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="mb-3">
+                    <small className="text-muted">Services</small>
+                    <ul className="mt-2">
+                      {services.length === 0 ? <li className="text-muted">No services discovered</li> : services.map((s) => <li key={s}><code>{s}</code></li>)}
+                    </ul>
+                  </div>
+
                 </div>
+              </div>
+            </div>
 
-                <div className="mt-4">
-                  <small className="text-muted">Quick code tip</small>
-                  <pre className="p-2 bg-light rounded" style={{ fontSize: 12 }}>
-{`// Capacitor BLE pattern:
-await BleClient.initialize();
-const device = await BleClient.requestDevice({ services: ['your-service-uuid']});
-await BleClient.connect(deviceId);
-await BleClient.read(deviceId, svc, chr);
-BleClient.startNotifications(deviceId, svc, chr, callback);`}
-                  </pre>
+            <div className="col-lg-7">
+              <div className="card h-100 border-0 shadow-sm">
+                <div className="card-body">
+                  <h4 className="mb-3">Live Activity & Logs</h4>
+                  <div className="mb-3">
+                    <small className="text-muted">Last message</small>
+                    <div className="p-3 bg-light rounded mt-2" style={{minHeight: 80}}>
+                      <code style={{whiteSpace: 'pre-wrap'}}>{lastMessage ?? 'No activity yet'}</code>
+                    </div>
+                  </div>
+
+                  <div className="mb-3">
+                    <small className="text-muted">Visual Battery</small>
+                    <div className="progress mt-2" style={{height: 18}}>
+                      {batteryLevel !== null ? (
+                        <div className="progress-bar bg-success" role="progressbar" style={{width: `${batteryLevel}%`}}>
+                          {batteryLevel}%
+                        </div>
+                      ) : (
+                        <div className="progress-bar bg-secondary progress-bar-striped progress-bar-animated" role="progressbar" style={{width: '100%'}}>
+                          Unknown
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="mt-4">
+                    <small className="text-muted">Presentation-ready Notes</small>
+                    <ul className="mt-2">
+                      <li>Use this panel during demo to show a successful connection and live characteristic reads.</li>
+                      <li>Start notifications and show incoming payloads in the 'Last message' box.</li>
+                      <li>For Android native demos, run via Capacitor (ensure required permissions are set).</li>
+                    </ul>
+                  </div>
+
                 </div>
               </div>
             </div>
@@ -349,6 +436,7 @@ BleClient.startNotifications(deviceId, svc, chr, callback);`}
       {/* Footer */}
       <footer className="bg-dark text-center text-white py-3">
         © {new Date().getFullYear()} POC — React + PWA + Capacitor Integration.
+  <span className="ms-3 text-white-50">v{APP_VERSION}</span>
       </footer>
     </div>
   );

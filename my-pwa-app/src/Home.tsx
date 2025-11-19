@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import "./Home.css";
 import { Capacitor } from "@capacitor/core";
 import AOS from "aos";
+import { APP_VERSION } from "./version";
 
 const Home: React.FC = () => {
   const [isApp, setIsApp] = useState(false);
@@ -371,6 +372,7 @@ const Home: React.FC = () => {
       {/* Footer */}
       <footer className="bg-dark text-center text-white py-3">
         © {new Date().getFullYear()} POC — React + PWA + Capacitor Integration.
+        <span className="ms-3 text-white-50">v{APP_VERSION}</span>
       </footer>
     </div>
   );

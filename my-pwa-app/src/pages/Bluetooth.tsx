@@ -257,13 +257,40 @@ const capStartNotifications = async (svc: string, char: string) => {
 
   /* ---------------- Web Bluetooth fallback (kept minimal) ---------------- */
   // If running as PWA in browser and plugin unavailable, keep your earlier navigator.bluetooth logic.
-  const webRequestAndConnect = async () => {
+  const webRequestAndConnect = async (serviceUuids: string[] = []) => {
     try {
-  if (!(navigator as any).bluetooth) throw new Error("Web Bluetooth API not available.");
-      const device = await (navigator as any).bluetooth.requestDevice({
-        acceptAllDevices: true,
-        optionalServices: ["battery_service", "device_information"],
-      });
+      if (!(navigator as any).bluetooth) throw new Error("Web Bluetooth API not available.");
+
+      // Helper mapping for friendly names to common UUIDs
+      const uuidMap: Record<string, string[]> = {
+        battery_service: ["battery_service", "180f", "0000180f-0000-1000-8000-00805f9b34fb"],
+        battery_level: ["battery_level", "2a19", "00002a19-0000-1000-8000-00805f9b34fb"],
+        device_information: ["device_information", "180a", "0000180a-0000-1000-8000-00805f9b34fb"],
+      };
+
+      // Build optionalServices list including provided serviceUuids and some sensible defaults
+      const optionalServices = new Set<string>([...serviceUuids]);
+      // always include battery and device info as useful defaults for the demo
+      ['battery_service','device_information'].forEach((k) => optionalServices.add(k));
+
+      // Expand friendly names to actual UUID strings for broader compatibility
+      const expanded: string[] = [];
+      for (const s of Array.from(optionalServices)) {
+        if (uuidMap[s]) {
+          uuidMap[s].forEach((u) => expanded.push(u));
+        } else {
+          expanded.push(s);
+        }
+      }
+
+      // If we have a targeted service, use filters to make the picker show relevant devices.
+      const hasTarget = serviceUuids.length > 0;
+      const requestOpts: any = hasTarget
+        ? { filters: [{ services: expanded }] , optionalServices: expanded }
+        : { acceptAllDevices: true, optionalServices: expanded };
+
+      const device = await (navigator as any).bluetooth.requestDevice(requestOpts);
+
       // minimal connect flow
       const server = await device.gatt.connect();
       setDeviceName(device.name ?? device.id);
@@ -278,11 +305,11 @@ const capStartNotifications = async (svc: string, char: string) => {
   };
 
   /* ---------------- UI wiring helpers ---------------- */
-  const requestDevice = async () => {
+  const requestDevice = async (serviceUuids: string[] = []) => {
     if (btAvailable === "capacitor") {
-      await capRequestAndConnect([]);
+      await capRequestAndConnect(serviceUuids);
     } else if (btAvailable === "web") {
-      await webRequestAndConnect();
+      await webRequestAndConnect(serviceUuids);
     } else {
       setLastMessage("Bluetooth not available on this platform.");
     }
@@ -365,7 +392,7 @@ const capStartNotifications = async (svc: string, char: string) => {
                       <button className="btn btn-primary" onClick={() => requestDevice()}>
                         <i className="bi bi-search me-1" /> Scan & Connect
                       </button>
-                      <button className="btn btn-secondary" onClick={() => capRequestAndConnect(['battery_service'])}>
+                      <button className="btn btn-secondary" onClick={() => requestDevice(['battery_service'])}>
                         <i className="bi bi-battery-half me-1" /> Connect (Battery)
                       </button>
                       <button className="btn btn-outline-danger" onClick={() => disconnect()}>

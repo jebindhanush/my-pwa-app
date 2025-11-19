@@ -50,6 +50,22 @@ const notificationCallbackRef = useRef<((ev: any) => void) | null>(null);
 
   /* ----------- Capacitor BLE helpers (preferred) -------------- */
 
+  // Helper: normalize friendly names or short UUIDs to 128-bit canonical UUIDs
+  const expandUuid = (id: string) => {
+    const map: Record<string, string> = {
+      battery_service: "0000180f-0000-1000-8000-00805f9b34fb",
+      battery_level: "00002a19-0000-1000-8000-00805f9b34fb",
+      device_information: "0000180a-0000-1000-8000-00805f9b34fb",
+    };
+    if (map[id]) return map[id];
+    const shortMatch = /^[0-9a-fA-F]{4}$/.test(id);
+    const fullMatch = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(id);
+    if (shortMatch) return `0000${id}-0000-1000-8000-00805f9b34fb`;
+    if (fullMatch) return id;
+    // unknown form: return as-is — plugin may error but we guard callers
+    return id;
+  };
+
   // Request device and connect using the Capacitor plugin
   const capRequestAndConnect = async (serviceUuids: string[] = []) => {
     try {
@@ -57,8 +73,10 @@ const notificationCallbackRef = useRef<((ev: any) => void) | null>(null);
       await BleClient.initialize();
 
       // `requestDevice` opens a native picker (Android) or uses Web Bluetooth where supported.
+      const normalizedServices = (serviceUuids || []).map((s) => expandUuid(s));
+      // `requestDevice` opens a native picker (Android) or uses Web Bluetooth where supported.
       const device = await BleClient.requestDevice({
-        services: serviceUuids,
+        services: normalizedServices,
         // if you pass an empty array it allows scanning devices (UI may show many)
         // prefer enumerating known service UUIDs for targeted UX
       });
@@ -70,17 +88,41 @@ const notificationCallbackRef = useRef<((ev: any) => void) | null>(null);
 
       // plugin device shape can differ between platforms; coerce to any for safety
       const d: any = device;
-      setDeviceId(d.deviceId ?? d.id ?? null);
-      setDeviceName(d.name ?? d.localName ?? d.id ?? null);
+      const chosenId = d.deviceId ?? d.id ?? null;
+      const chosenName = d.name ?? d.localName ?? d.id ?? null;
+      setDeviceId(chosenId);
+      setDeviceName(chosenName);
 
-      // Connect (BleClient.connect may return void depending on plugin version)
-      await BleClient.connect(d.deviceId ?? d.id);
+      // Debug: surface the picked device object so we can triage unsupported devices
+      try {
+        console.debug('Picked device object (capacitor):', d);
+        setLastMessage(`Selected device: ${chosenName} (${chosenId})`);
+      } catch (e) {
+        // ignore stringify errors
+      }
+
+      // Connect (BleClient.connect may throw if device doesn't support required profiles)
+      try {
+        await BleClient.connect(chosenId);
+      } catch (connectErr: any) {
+        console.error('BleClient.connect failed:', connectErr);
+        // Provide a clearer message for demo: unsupported or connection refused
+        setLastMessage(`Connect failed: ${connectErr?.message ?? connectErr}`);
+        setIsConnected(false);
+        return;
+      }
+
       setIsConnected(true);
-      setLastMessage(`Connected to ${d.name ?? d.deviceId ?? d.id}`);
+      setLastMessage(`Connected to ${chosenName ?? chosenId}`);
 
       // List primary services and normalize to strings
-      const svcs = await BleClient.getServices(d.deviceId ?? d.id);
-      setServices((svcs || []).map((s: any) => s.service ?? s.uuid ?? s));
+      try {
+        const svcs = await BleClient.getServices(chosenId);
+        setServices((svcs || []).map((s: any) => s.service ?? s.uuid ?? s));
+      } catch (svcErr: any) {
+        console.warn('getServices failed:', svcErr);
+        setLastMessage((prev) => `${prev} — getServices error: ${svcErr?.message ?? svcErr}`);
+      }
     } catch (err: any) {
       console.error("capRequestAndConnect:", err);
       setLastMessage(`Error: ${err?.message ?? err}`);
@@ -157,14 +199,23 @@ const notificationCallbackRef = useRef<((ev: any) => void) | null>(null);
       return { text: String(val), bytes: null, dv: null };
     };
 
-    // Known UUID mappings for common names (battery)
-    const uuidMap: Record<string, string[]> = {
-      battery_service: ["battery_service", "180f", "0000180f-0000-1000-8000-00805f9b34fb"],
-      battery_level: ["battery_level", "2a19", "00002a19-0000-1000-8000-00805f9b34fb"],
+    // Expand candidates to accept short or canonical forms
+    const expandCandidates = (id: string) => {
+      if (!id) return [id];
+      const map: Record<string, string[]> = {
+        battery_service: ["0000180f-0000-1000-8000-00805f9b34fb"],
+        battery_level: ["00002a19-0000-1000-8000-00805f9b34fb"],
+      };
+      if (map[id]) return map[id];
+      // short 4-hex
+      if (/^[0-9a-fA-F]{4}$/.test(id)) return [`0000${id}-0000-1000-8000-00805f9b34fb`];
+      // canonical 128
+      if (/^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(id)) return [id];
+      return [id];
     };
 
-    const svcCandidates = uuidMap[svc] ?? [svc];
-    const charCandidates = uuidMap[char] ?? [char];
+    const svcCandidates = expandCandidates(svc);
+    const charCandidates = expandCandidates(char);
 
     let lastErr: any = null;
     try {
@@ -204,7 +255,24 @@ const notificationCallbackRef = useRef<((ev: any) => void) | null>(null);
       if (!deviceId) throw new Error("Not connected to device.");
       const bytes = new TextEncoder().encode(text);
       // plugin expects base64able array buffer; write accepts numbersToDataView helper
-      await BleClient.write(deviceId, svc, char, numbersToDataView(Array.from(bytes)));
+      // Try normalized UUID forms for write (some plugin versions expect 128-bit strings)
+      const svcCandidates = [expandUuid(svc)];
+      const charCandidates = [expandUuid(char)];
+      let wrote = false;
+      let lastErr: any = null;
+      for (const s of svcCandidates) {
+        for (const c of charCandidates) {
+          try {
+            await BleClient.write(deviceId, s, c, numbersToDataView(Array.from(bytes)));
+            wrote = true;
+            break;
+          } catch (e: any) {
+            lastErr = e;
+          }
+        }
+        if (wrote) break;
+      }
+      if (!wrote) throw lastErr ?? new Error('Write failed');
       setLastMessage(`Wrote to ${char}: ${text}`);
     } catch (err: any) {
       console.error("capWrite:", err);
@@ -229,8 +297,35 @@ const capStartNotifications = async (svc: string, char: string) => {
       setLastMessage(`Notification (${char}): ${text}`);
     };
     notificationCallbackRef.current = cb;
-    await BleClient.startNotifications(deviceId, svc, char, cb);
-    setLastMessage(`Notifications started for ${char}`);
+
+    // Expand possible UUID forms and try to start notifications on the first that succeeds
+    const svcCandidates = [svc].flatMap((s) => {
+      if (s === 'battery_service') return [expandUuid('battery_service')];
+      if (/^[0-9a-fA-F]{4}$/.test(s)) return [`0000${s}-0000-1000-8000-00805f9b34fb`];
+      return [s];
+    });
+    const charCandidates = [char].flatMap((c) => {
+      if (c === 'battery_level') return [expandUuid('battery_level')];
+      if (/^[0-9a-fA-F]{4}$/.test(c)) return [`0000${c}-0000-1000-8000-00805f9b34fb`];
+      return [c];
+    });
+
+    let started = false;
+    let lastErr: any = null;
+    for (const s of svcCandidates) {
+      for (const c of charCandidates) {
+        try {
+          await BleClient.startNotifications(deviceId, s, c, cb);
+          setLastMessage(`Notifications started for ${c}`);
+          started = true;
+          break;
+        } catch (e: any) {
+          lastErr = e;
+        }
+      }
+      if (started) break;
+    }
+    if (!started) throw lastErr ?? new Error('startNotifications failed');
   } catch (err: any) {
     console.error("capStartNotifications:", err);
     setLastMessage(`startNotifications error: ${err?.message ?? err}`);
@@ -241,7 +336,15 @@ const capStartNotifications = async (svc: string, char: string) => {
   const capStopNotifications = async (svc: string, char: string) => {
     try {
       if (!deviceId) throw new Error("Not connected to device.");
-      await BleClient.stopNotifications(deviceId, svc, char);
+      // Try normalized candidates for stopNotifications as well
+      const svc128 = expandUuid(svc);
+      const char128 = expandUuid(char);
+      try {
+        await BleClient.stopNotifications(deviceId, svc128, char128);
+      } catch (e) {
+        // best-effort: try raw values as fallback
+        await BleClient.stopNotifications(deviceId, svc, char);
+      }
       notificationCallbackRef.current = null;
       setLastMessage(`Notifications stopped for ${char}`);
     } catch (err: any) {
